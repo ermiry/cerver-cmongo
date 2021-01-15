@@ -1,0 +1,39 @@
+ARG CERVER_VERSION
+ARG CMONGO_VERSION
+
+FROM ermiry/mongoc:builder as builder
+
+RUN apt-get update && apt-get install -y libssl-dev
+
+# build cerver with development flags
+ARG CERVER_VERSION
+RUN mkdir /opt/cerver && cd /opt/cerver \
+    && wget -q --no-check-certificate https://github.com/ermiry/cerver/archive/${CERVER_VERSION}.zip \
+    && unzip ${CERVER_VERSION}.zip \
+    && cd cerver-${CERVER_VERSION} \
+    && make -j4
+
+# build cmongo with development flags
+ARG CMONGO_VERSION
+RUN mkdir /opt/cmongo && cd /opt/cmongo \
+    && wget -q --no-check-certificate https://github.com/ermiry-com/cmongo/archive/${CMONGO_VERSION}.zip \
+    && unzip ${CMONGO_VERSION}.zip \
+    && cd cmongo-${CMONGO_VERSION} \
+    && make -j4
+
+############
+FROM ermiry/mongoc:builder
+
+# cerver
+ARG CERVER_VERSION
+COPY --from=builder /opt/cerver/cerver-${CERVER_VERSION}/bin/libcerver.so /usr/local/lib/
+COPY --from=builder /opt/cerver/cerver-${CERVER_VERSION}/include/cerver /usr/local/include/cerver
+
+# cmongo
+ARG CMONGO_VERSION
+COPY --from=builder /opt/cmongo/cmongo-${CMONGO_VERSION}/bin/libcmongo.so /usr/local/lib/
+COPY --from=builder /opt/cmongo/cmongo-${CMONGO_VERSION}/include/cmongo /usr/local/include/cmongo
+
+RUN ldconfig
+
+CMD ["/bin/bash"]
